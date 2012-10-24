@@ -100,9 +100,9 @@ class LinkedinspiderSpider(CrawlSpider):
             pass
         
     def get_follow_links(self, level, hxs):
-        if level == 1:
+        if level in [1,2,3]:
             relative_urls = hxs.select("//ul[@class='directory']/li/a/@href").extract()
             relative_urls = ["http://linkedin.com" + x for x in relative_urls]
             return relative_urls
-        elif level == 2:
+        elif level == 4:
             return []
