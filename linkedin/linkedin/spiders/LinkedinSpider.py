@@ -1,6 +1,7 @@
 from scrapy.selector import HtmlXPathSelector
 from scrapy.contrib.linkextractors.sgml import SgmlLinkExtractor
 from scrapy.contrib.spiders import CrawlSpider, Rule
+from scrapy.http import Request
 from scrapy import log
 from linkedin.items import LinkedinItem
 from os import path
@@ -47,54 +48,24 @@ class LinkedinspiderSpider(CrawlSpider):
         """
         hxs = HtmlXPathSelector(response)
         index_level = self.determine_level(response)
-        if index_level == 1:
+        if index_level in [1, 2, 3]:
             # get second level urls to crawl
             self.save_to_file_system(index_level, response)
-            pass
-        elif index_level == 2:
-            # get third level urls to crawl
-            pass
-        elif index_level == 3:
+            relative_urls = self.get_follow_links(index_level, hxs)
+            if relative_urls is not None:
+                for url in relative_urls:
+                    yield Request(url, callback=self.parse)
             pass
         elif index_level == 4:
             pass
-        i = LinkedinItem()
-        #i['domain_id'] = hxs.select('//input[@id="sid"]/@value').extract()
-        #i['name'] = hxs.select('//div[@id="name"]').extract()
-        #i['description'] = hxs.select('//div[@id="description"]').extract()
-        return i
-    
-    def parse_item(self, response):
-        hxs = HtmlXPathSelector(response)
-        index_level = self.determine_level(response)
-        if index_level == 1:
-            # get second level urls to crawl
-            self.save_to_file_system(index_level, response)
-            # TODO yield new request
-            pass
-        elif index_level == 2:
-            # get third level urls to crawl
-            # TODO yield new request
-            pass
-        elif index_level == 3:
-            # TODO yield new request
-            pass
-        elif index_level == 4:
-            pass
-        i = LinkedinItem()
-        #i['domain_id'] = hxs.select('//input[@id="sid"]/@value').extract()
-        #i['name'] = hxs.select('//div[@id="name"]').extract()
-        #i['description'] = hxs.select('//div[@id="description"]').extract()
-        return i
-
     
     def determine_level(self, response):
         """
         determine the index level of current response, so we can decide wether to continue crawl or not.
-        first level: people/[a-z].html
-        second level: people/[A-Z][\d+].html
-        third level: people/?.html
-        fourth level: profile link or search link
+        level 1: people/[a-z].html
+        level 2: people/[A-Z][\d+].html
+        level 3: people/[a-zA-Z0-9-]+.html
+        level 4: profile link or search link
         """
         import re
         url = response.url
@@ -111,19 +82,27 @@ class LinkedinspiderSpider(CrawlSpider):
         """
         save the response to related folder
         """
-        if level in [1,2,3]:
+        if level in [1, 2, 3]:
             fileName = self.get_clean_file_name(level, response)
-            fn = path.join(self.settings["DOWNLOAD_FILE_FOLDER"],"first_level",fileName)
+            fn = path.join(self.settings["DOWNLOAD_FILE_FOLDER"], str(level), fileName)
             self.log("Saving to %s" % fn, level=log.DEBUG)
-            with open(fn,"w") as f:
+            with open(fn, "w") as f:
                 f.write(response.body)
         elif level == 4:
             # deal with search page or true personal profile page
             pass
     
     def get_clean_file_name(self, level, response):
-        if level in [1,2,3]:
+        if level in [1, 2, 3]:
             fn = response.url.split("/")[-1]
             return fn
         elif level == 4:
             pass
+        
+    def get_follow_links(self, level, hxs):
+        if level == 1:
+            relative_urls = hxs.select("//ul[@class='directory']/li/a/@href").extract()
+            relative_urls = ["http://linkedin.com" + x for x in relative_urls]
+            return relative_urls
+        elif level == 2:
+            return []
