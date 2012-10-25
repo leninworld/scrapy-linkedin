@@ -6,6 +6,8 @@ from scrapy import log
 from linkedin.items import LinkedinItem
 from os import path
 
+import os
+
 class LinkedinspiderSpider(CrawlSpider):
     name = 'LinkedinSpider'
     allowed_domains = ['linkedin.com']
@@ -48,16 +50,13 @@ class LinkedinspiderSpider(CrawlSpider):
         """
         hxs = HtmlXPathSelector(response)
         index_level = self.determine_level(response)
-        if index_level in [1, 2, 3]:
+        if index_level in [1, 2, 3, 4, 5]:
             # get second level urls to crawl
             self.save_to_file_system(index_level, response)
             relative_urls = self.get_follow_links(index_level, hxs)
             if relative_urls is not None:
                 for url in relative_urls:
                     yield Request(url, callback=self.parse)
-            pass
-        elif index_level == 4:
-            pass
     
     def determine_level(self, response):
         """
@@ -65,7 +64,8 @@ class LinkedinspiderSpider(CrawlSpider):
         level 1: people/[a-z].html
         level 2: people/[A-Z][\d+].html
         level 3: people/[a-zA-Z0-9-]+.html
-        level 4: profile link or search link
+        level 4: search page, pub/dir/.+
+        level 5: profile page
         """
         import re
         url = response.url
@@ -75,34 +75,31 @@ class LinkedinspiderSpider(CrawlSpider):
             return 2
         elif re.match(".+/people/[a-zA-Z0-9-]+.html", url):
             return 3
-        # TODO seperate search page and personal profile page.
-        return 4
+        elif re.match(".+/pub/dir/.+", url):
+            return 4
+        elif re.match(".+/pub/.+", url):
+            return 5
+        return None
     
     def save_to_file_system(self, level, response):
         """
         save the response to related folder
         """
-        if level in [1, 2, 3]:
-            fileName = self.get_clean_file_name(level, response)
+        if level in [1, 2, 3, 4, 5]:
+            fileName = response.url.split("/")[-1]
             fn = path.join(self.settings["DOWNLOAD_FILE_FOLDER"], str(level), fileName)
-            self.log("Saving to %s" % fn, level=log.DEBUG)
+            self.create_path_if_not_exist(fn)
             with open(fn, "w") as f:
                 f.write(response.body)
-        elif level == 4:
-            # deal with search page or true personal profile page
-            pass
     
-    def get_clean_file_name(self, level, response):
-        if level in [1, 2, 3]:
-            fn = response.url.split("/")[-1]
-            return fn
-        elif level == 4:
-            pass
-        
     def get_follow_links(self, level, hxs):
-        if level in [1,2,3]:
+        if level in [1, 2, 3]:
             relative_urls = hxs.select("//ul[@class='directory']/li/a/@href").extract()
             relative_urls = ["http://linkedin.com" + x for x in relative_urls]
             return relative_urls
         elif level == 4:
             return []
+
+    def create_path_if_not_exist(self, filePath):
+        if not path.exists(filePath):
+            os.makedirs(filePath)
