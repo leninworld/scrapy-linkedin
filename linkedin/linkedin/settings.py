@@ -14,4 +14,10 @@ NEWSPIDER_MODULE = 'linkedin.spiders'
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'linkedin (+http://www.yourdomain.com)'
 
+# Enable auto throttle
+AUTOTHROTTLE_ENABLED = True
+
+# Set your own download folder
 DOWNLOAD_FILE_FOLDER = '/Users/ChenWei/Documents/internet/com/github/scrapy-linkedin/linkedin/download_file'
+
+
